@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>競馬予想AI</title>
+    <script src="https://code.jquery.com/jquery-3.7.1.js"></script>
+</head>
+<body>
+
+<div>
+    <div>
+        <h1>競馬予想AI</h1>
+        レースIDを入力し、ボタンを押してください。<br>
+        推論に時間がかかるため、数秒～数分待ってください。
+        <hr>
+        <small>
+            レースIDは、以下を参考に取得してください。<br>
+            https://race.netkeiba.com/race/shutuba.html?race_id=<b>202404030811</b>&rf=race_list
+        </small>
+    </div>
+
+    レースID: <input type="text" id="race-id">
+    <button onclick="send();" id="btn">予想する</button>
+</div>
+
+<br><br>
+<hr>
+
+<div>
+    <div>
+        <ul>
+            <li>「予想結果1」は、主にG1などの人気で決まりやすいレース向け</li>
+            <li>「予想結果2」は、主に新馬戦などの情報が少ないレースや、大穴狙いなど向け</li>
+        </ul>
+    </div>
+
+    <div>
+        <h2>予想結果1</h2>
+        <span style="font-size: 30px" id="res11">-</span>
+        <span style="font-size: 30px">,</span>
+        <span style="font-size: 30px" id="res12">-</span>
+        <span style="font-size: 30px">,</span>
+        <span style="font-size: 30px" id="res13">-</span>
+        <span style="font-size: 30px">,</span>
+        <span style="font-size: 30px" id="res14">-</span>
+        <span style="font-size: 30px">,</span>
+        <span style="font-size: 30px" id="res15">-</span>
+    </div>
+
+    <div>
+        <h2>予想結果2</h2>
+        <span style="font-size: 30px" id="res21">-</span>
+        <span style="font-size: 30px">,</span>
+        <span style="font-size: 30px" id="res22">-</span>
+        <span style="font-size: 30px">,</span>
+        <span style="font-size: 30px" id="res23">-</span>
+        <span style="font-size: 30px">,</span>
+        <span style="font-size: 30px" id="res24">-</span>
+        <span style="font-size: 30px">,</span>
+        <span style="font-size: 30px" id="res25">-</span>
+    </div>
+</div>
+
+<script>
+    function setText(s, id){
+        console.log("s:", s);
+        console.log(`res${id}1`)
+        console.log(document.getElementById(`res${id}1`));
+        if(s[0] != 0 || s[0] == "E"){
+            document.getElementById(`res${id}1`).innerHTML = s[0];
+        }
+        else{
+            document.getElementById(`res${id}1`).innerHTML = "-";
+        }
+
+        if(s[1] != 0 || s[1] == "R"){
+            document.getElementById(`res${id}2`).innerHTML = s[1];
+        }
+        else{
+            document.getElementById(`res${id}2`).innerHTML = "-";
+        }
+
+        if(s[2] != 0 || s[2] == "R"){
+            document.getElementById(`res${id}3`).innerHTML = s[2];
+        }
+        else{
+            document.getElementById(`res${id}3`).innerHTML = "-";
+        }
+
+        if(s[3] != 0 || s[3] == "O"){
+            document.getElementById(`res${id}4`).innerHTML = s[3];
+        }
+        else{
+            document.getElementById(`res${id}4`).innerHTML = "-";
+        }
+
+        if(s[4] != 0 || s[4] == "R"){
+            document.getElementById(`res${id}5`).innerHTML = s[4];
+        }
+        else{
+            document.getElementById(`res${id}5`).innerHTML = "-";
+        }
+    }
+
+    function send(){
+        let raceID = document.getElementById("race-id").value;
+        document.getElementById("btn").disabled = true;
+
+        // 表示をリセット
+        setText([0, 0, 0, 0, 0], 1);
+        setText([0, 0, 0, 0, 0], 2);
+
+        $.ajax({
+            url: "/predict",
+            type: "POST",
+            data: {
+                raceID: raceID
+            },
+            success: function(response){
+                document.getElementById("btn").disabled = false;
+                let result = response;
+
+                setText(result["result1"], 1);
+                setText(result["result2"], 2);
+            },
+            error: function(xhr, status, error) {
+                console.error('Error:', error);
+                setText(["E", "R", "R", "O", "R"], 1);
+                setText(["E", "R", "R", "O", "R"], 2);
+                alert("サーバーエラーです。管理者に問い合わせてください");
+            }
+
+        })
+    }
+</script>
+
+</body>
+</html>
