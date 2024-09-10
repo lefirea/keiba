@@ -22,7 +22,6 @@ def getPopulation(url, info, driver):
         driver.get(url)
     except TimeoutException:
         pass
-    # sleep(1)
 
     html = driver.page_source
     rankingBS = BeautifulSoup(html, features="lxml")
@@ -36,8 +35,6 @@ def getPopulation(url, info, driver):
 
     # レース場を取得
     course = rankingBS.body.find("div", class_="RaceKaisaiWrap").find("li", class_="Active").find("a").text
-    # course = course.split()[1]
-    # course = reg.sub("", course)
     info[course] = 1
 
     # 距離を取得
@@ -49,11 +46,21 @@ def getPopulation(url, info, driver):
     # 着順、馬番、単勝、人気などを取得
     table = rankingBS.body.find("table", class_="RaceTable01").find("tbody")
     trs = table.find_all("tr")
-    for tr in trs[1:]:  # ヘッダー行を含めない
+    for tr in trs:  # ヘッダー行を含めない
         tds = tr.find_all("td")
         number = int(tds[1].text.strip())  # 馬番
-        info[number]["単勝"] = float(tds[9].find("span").text.strip())
-        info[number]["人気"] = int(tds[10].find("span").text.strip())
+        odds = tds[9].find("span").text.strip()
+        popular = tds[10].find("span").text.strip()
+
+        try:
+            info[number]["単勝"] = float(tds[9].find("span").text.strip())
+        except:
+            info[number]["単勝"] = -1.0
+
+        try:
+            info[number]["人気"] = int(tds[10].find("span").text.strip())
+        except:
+            info[number]["人気"] = -1
 
         # 性別と年齢
         sex = tds[4].text.strip()[0]
@@ -65,7 +72,7 @@ def getPopulation(url, info, driver):
 
         # 体重と増減
         weights = tds[8].text.strip()
-        if weights in ["計不"] or weights == "" or weights == "--":
+        if weights in ["計不"] or not weights.isdigit():
             weights = "9999(9999)"
         info[number]["馬体重"] = int(weights.split("(")[0])
 
@@ -128,9 +135,13 @@ def getHasira(url, info, driver):
 def getData(raceID):
     # selenium設定
     options = webdriver.ChromeOptions()
-    options.add_argument("--no-sandbox")
+    # options.add_argument("enable-automation")
     options.add_argument("--headless")
-    options.add_argument("--disable-gpu")
+    options.add_argument('--remote-debugging-pipe')
+    # options.add_argument("--no-sandbox")
+    # options.add_argument("--disable-extensions")
+    # options.add_argument("--dns-prefetch-disable")
+    # options.add_argument("--disable-gpu")
     driver = webdriver.Chrome(options=options)
     driver.set_page_load_timeout(5)
 
@@ -162,14 +173,22 @@ def getData(raceID):
             "5走順位": 0
         }
 
-    raceInfo = getPopulation(infoUrl.format(raceID), raceInfo, driver)
-    raceInfo = getHasira(hasira5.format(raceID), raceInfo, driver)
+    try:
+        raceInfo = getPopulation(infoUrl.format(raceID), raceInfo, driver)
+        raceInfo = getHasira(hasira5.format(raceID), raceInfo, driver)
+    except:
+        driver.quit()
+        raceInfo = getPopulation(infoUrl.format(raceID), raceInfo, driver)
+        raceInfo = getHasira(hasira5.format(raceID), raceInfo, driver)
+
+    driver.quit()
 
     return raceInfo
 
 
 def predict(raceID):
     raceData = getData(raceID)
+    cwd = "/home/ubuntu/keiba"
 
     columns = [
         "馬番",
@@ -256,7 +275,7 @@ def predict(raceID):
     }
     dx = DMatrix(table[columns])
     model = trainer.Booster(params)
-    model.load_model("all_log.model")
+    model.load_model(f"{cwd}/all_log.model")
 
     pred = model.predict(dx)
     pred = [(i + 1, pred[i]) for i in range(len(pred))]
@@ -281,7 +300,7 @@ def predict(raceID):
     ]
     dx = DMatrix(table[columns])
     model = trainer.Booster(params)
-    model.load_model("without_pop_rank_log.model")
+    model.load_model(f"{cwd}/without_pop_rank_log.model")
 
     pred = model.predict(dx)
     pred = [(i + 1, pred[i]) for i in range(len(pred))]
