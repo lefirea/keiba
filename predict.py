@@ -5,9 +5,12 @@ from pprint import pprint
 
 import pandas as pd
 import xgboost as trainer
+import chromedriver_autoinstaller as chrome_inst
 from xgboost import DMatrix
 from selenium.common.exceptions import TimeoutException
 from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 from datetime import datetime
 from bs4 import BeautifulSoup
 
@@ -17,7 +20,7 @@ reg = re.compile(r"芝|ダ|右|左|外|内|(2周)|(直線)|\(|\)|([0-9]回)|([0-
 
 def getPopulation(url, info, driver):
     raceID = url.split("?")[1].split("&")[0].split("=")[1]
-
+    
     try:
         driver.get(url)
     except TimeoutException:
@@ -29,6 +32,8 @@ def getPopulation(url, info, driver):
     # レース開催日を取得
     raceDay = rankingBS.body.find("div", class_="RaceChange_BtnArea").find("dd", class_="Active").find("a").text
     raceDay = raceDay.split("(")[0]
+    if "/" in raceDay:
+        raceDay = raceDay.replace("/", "月") + "日"
     raceDay = raceID[:4] + "年" + raceDay
     raceDay = datetime.strptime(raceDay, "%Y年%m月%d日")
     info["day"] = raceDay
@@ -92,12 +97,12 @@ def getPopulation(url, info, driver):
 
 def getHasira(url, info, driver):
     hasiraTitle = ["前走順位", "2走順位", "3走順位", "4走順位", "5走順位"]
-
+    
     try:
         driver.get(url)
     except TimeoutException:
         pass
-    sleep(1)
+    
     hasiraBS = BeautifulSoup(driver.page_source, features="html.parser")
     body = hasiraBS.body
     table = body.find("table", class_="Shutuba_Past5_Table").find("tbody")
@@ -133,17 +138,32 @@ def getHasira(url, info, driver):
 
 
 def getData(raceID):
+    chrome_inst.install()
+
     # selenium設定
+    executable_path = "/usr/local/bin/chromedriver"
+    UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/99.0.4844.51 Safari/537.36'
+
     options = webdriver.ChromeOptions()
-    # options.add_argument("enable-automation")
-    options.add_argument("--headless")
+    options.add_argument('--user-agent=' + UA)
+    # options.add_argument('--no-sandbox')
+    # options.add_argument("--headless")
     options.add_argument('--remote-debugging-pipe')
-    # options.add_argument("--no-sandbox")
-    # options.add_argument("--disable-extensions")
-    # options.add_argument("--dns-prefetch-disable")
-    # options.add_argument("--disable-gpu")
+    # options.add_argument('--disable-dev-shm-usage')
+
+    options.add_argument("start-maximized")
+    options.add_argument("enable-automation")
+    options.add_argument("--headless")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--disable-browser-side-navigation")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--window-size=1920,1080")
+    options.binary_location = "/usr/bin/chromium-browser"
+
+    # service = Service(executable_path=executable_path)
     driver = webdriver.Chrome(options=options)
-    driver.set_page_load_timeout(5)
+    driver.set_page_load_timeout(3)
 
     infoUrl = "https://race.netkeiba.com/race/shutuba.html?race_id={}&rf=race_submenu"
     hasira5 = "https://race.netkeiba.com/race/shutuba_past.html?race_id={}&rf=shutuba_submenu"
@@ -173,13 +193,25 @@ def getData(raceID):
             "5走順位": 0
         }
 
-    try:
-        raceInfo = getPopulation(infoUrl.format(raceID), raceInfo, driver)
-        raceInfo = getHasira(hasira5.format(raceID), raceInfo, driver)
-    except:
-        driver.quit()
-        raceInfo = getPopulation(infoUrl.format(raceID), raceInfo, driver)
-        raceInfo = getHasira(hasira5.format(raceID), raceInfo, driver)
+    raceInfo = getPopulation(infoUrl.format(raceID), raceInfo, driver)
+    # f = True
+    # while f:
+    #     try:
+    #         raceInfo = getPopulation(infoUrl.format(raceID), raceInfo, driver)
+    #         f = False
+    #     except TimeoutException:
+    #         print("except p")
+    #         sleep(1)
+
+    raceInfo = getHasira(hasira5.format(raceID), raceInfo, driver)
+    # f = True
+    # while f:
+    #     try:
+    #         raceInfo = getHasira(hasira5.format(raceID), raceInfo, driver)
+    #         f = False
+    #     except TimeoutException:
+    #         print("except h")
+    #         sleep(1)
 
     driver.quit()
 
